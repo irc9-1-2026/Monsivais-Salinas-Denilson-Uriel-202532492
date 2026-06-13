@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SysWatch — Monitor de Rendimiento</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  /* ── Tokens ─────────────────────────────────────────── */
+  :root {
+    --bg:        #0a0c10;
+    --surface:   #111318;
+    --surface2:  #181b22;
+    --border:    #1e2330;
+    --accent:    #3b82f6;
+    --accent2:   #06b6d4;
+    --green:     #22c55e;
+    --yellow:    #eab308;
+    --red:       #ef4444;
+    --text:      #e2e8f0;
+    --muted:     #64748b;
+    --font-mono: 'JetBrains Mono', 'Fira Mono', monospace;
+    --font-ui:   'Inter', system-ui, sans-serif;
+    --radius:    10px;
+  }
+
+  /* ── Reset ──────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 14px; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    min-height: 100vh;
+    padding: 0 0 3rem;
+  }
+  a { color: inherit; text-decoration: none; }
+
+  /* ── Topbar ─────────────────────────────────────────── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2rem;
+    height: 56px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 50;
+  }
+  .topbar-brand {
+    display: flex; align-items: center; gap: .6rem;
+    font-family: var(--font-mono);
+    font-size: 1.05rem; font-weight: 700;
+    letter-spacing: .04em;
+  }
+  .topbar-brand span { color: var(--accent); }
+  .topbar-right { display: flex; align-items: center; gap: 1.2rem; }
+  .badge-live {
+    display: flex; align-items: center; gap: .4rem;
+    font-size: .72rem; font-family: var(--font-mono);
+    color: var(--green); text-transform: uppercase; letter-spacing: .08em;
+  }
+  .badge-live .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    animation: pulse 1.4s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; } 50% { opacity: .35; }
+  }
+  .clock {
+    font-family: var(--font-mono); font-size: .8rem; color: var(--muted);
+  }
+
+  /* ── Layout ─────────────────────────────────────────── */
+  .page { max-width: 1440px; margin: 0 auto; padding: 1.5rem 2rem; }
+
+  /* ── Section header ─────────────────────────────────── */
+  .section-header {
+    display: flex; align-items: center; gap: .75rem;
+    margin-bottom: 1rem;
+  }
+  .section-header h2 {
+    font-size: .7rem; font-weight: 600;
+    letter-spacing: .12em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .section-header::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  /* ── Selector de día ────────────────────────────────── */
+  .controls {
+    display: flex; align-items: center; gap: 1rem;
+    margin-bottom: 1.5rem; flex-wrap: wrap;
+  }
+  .controls label { font-size: .78rem; color: var(--muted); }
+  .controls select, .controls button {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 6px; padding: .4rem .9rem;
+    font-size: .82rem; cursor: pointer; font-family: var(--font-mono);
+    transition: border-color .2s;
+  }
+  .controls select:focus, .controls button:focus { outline: none; border-color: var(--accent); }
+  .controls button.active {
+    background: var(--accent); border-color: var(--accent); color: #fff;
+  }
+  #modo-label {
+    font-family: var(--font-mono); font-size: .75rem;
+    padding: .3rem .8rem; border-radius: 20px;
+    background: #1a2535; color: var(--accent2); border: 1px solid #1e3a5f;
+  }
+
+  /* ── KPI cards ──────────────────────────────────────── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem; margin-bottom: 1.5rem;
+  }
+  .kpi {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.1rem 1.3rem;
+    display: flex; flex-direction: column; gap: .4rem;
+    transition: border-color .25s;
+  }
+  .kpi:hover { border-color: var(--accent); }
+  .kpi-label {
+    font-size: .68rem; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600;
+  }
+  .kpi-value {
+    font-family: var(--font-mono); font-size: 1.9rem; font-weight: 700;
+    line-height: 1; color: var(--text);
+  }
+  .kpi-value .unit { font-size: .9rem; color: var(--muted); margin-left: .2rem; }
+  .kpi-bar-wrap { height: 4px; background: var(--border); border-radius: 2px; margin-top: .3rem; }
+  .kpi-bar { height: 4px; border-radius: 2px; transition: width .5s ease; }
+  .kpi-sub { font-size: .72rem; color: var(--muted); }
+  .kpi-alert { font-size: .7rem; color: var(--red); margin-top: .2rem; }
+
+  /* ── Chart grid ─────────────────────────────────────── */
+  .chart-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem; margin-bottom: 1.5rem;
+  }
+  @media (max-width: 860px) { .chart-grid { grid-template-columns: 1fr; } }
+
+  .chart-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.2rem;
+  }
+  .chart-title {
+    font-size: .68rem; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600; margin-bottom: .9rem;
+  }
+  .chart-wrap { position: relative; height: 180px; }
+
+  /* ── Procesos tabla ─────────────────────────────────── */
+  .proc-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.2rem;
+    margin-bottom: 1.5rem; overflow-x: auto;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    font-size: .66rem; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); padding: .5rem .75rem; text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody tr { transition: background .15s; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody td {
+    padding: .55rem .75rem; font-family: var(--font-mono);
+    font-size: .78rem; border-bottom: 1px solid #12151d;
+  }
+  .td-name { color: var(--text); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .td-pid  { color: var(--muted); }
+  .cpu-pill {
+    display: inline-block; padding: .15rem .5rem; border-radius: 4px;
+    font-size: .7rem; font-weight: 700;
+    background: #1a2535; color: var(--accent2);
+  }
+  .cpu-pill.med { background: #2a2010; color: var(--yellow); }
+  .cpu-pill.hi  { background: #2a1010; color: var(--red); }
+
+  /* ── Info sistema ───────────────────────────────────── */
+  .sys-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: .6rem;
+  }
+  .sys-row {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--surface2); border-radius: 6px;
+    padding: .5rem .9rem; font-size: .78rem;
+  }
+  .sys-row .sk { color: var(--muted); }
+  .sys-row .sv { font-family: var(--font-mono); color: var(--text); }
+
+  /* ── Footer ─────────────────────────────────────────── */
+  .footer {
+    margin-top: 2.5rem; text-align: center;
+    font-size: .68rem; color: var(--muted);
+    font-family: var(--font-mono);
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ TOPBAR ══════════════════════════════════════════════════════ -->
+<div class="topbar">
+  <div class="topbar-brand">⬡ Sys<span>Watch</span></div>
+  <div class="topbar-right">
+    <div class="badge-live"><div class="dot"></div> Live</div>
+    <div class="clock" id="reloj">--:--:--</div>
+  </div>
+</div>
+
+<!-- ══ MAIN ════════════════════════════════════════════════════════ -->
+<div class="page">
+
+  <!-- Selector de modo / día -->
+  <div class="controls">
+    <button id="btn-live" class="active" onclick="setModo('live')">⚡ En vivo</button>
+    <button id="btn-hist" onclick="setModo('hist')">📅 Historial</button>
+    <label for="sel-dia">Fecha</label>
+    <select id="sel-dia" disabled onchange="cargarHistorial()">
+      <option value="">— seleccionar día —</option>
+    </select>
+    <span id="modo-label">MODO: EN VIVO</span>
+  </div>
+
+  <!-- KPIs -->
+  <div class="section-header"><h2>KPIs de rendimiento</h2></div>
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-label">CPU</div>
+      <div class="kpi-value" id="kv-cpu">0<span class="unit">%</span></div>
+      <div class="kpi-bar-wrap"><div class="kpi-bar" id="kb-cpu" style="width:0%;background:var(--accent)"></div></div>
+      <div class="kpi-sub" id="ks-cpu">— núcleos · — MHz</div>
+      <div class="kpi-alert" id="ka-cpu"></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Memoria RAM</div>
+      <div class="kpi-value" id="kv-ram">0<span class="unit">%</span></div>
+      <div class="kpi-bar-wrap"><div class="kpi-bar" id="kb-ram" style="width:0%;background:var(--accent2)"></div></div>
+      <div class="kpi-sub" id="ks-ram">— / — GB</div>
+      <div class="kpi-alert" id="ka-ram"></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Disco C:</div>
+      <div class="kpi-value" id="kv-disco">0<span class="unit">%</span></div>
+      <div class="kpi-bar-wrap"><div class="kpi-bar" id="kb-disco" style="width:0%;background:var(--green)"></div></div>
+      <div class="kpi-sub" id="ks-disco">— / — GB</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Red — Enviado</div>
+      <div class="kpi-value" id="kv-net-s">0<span class="unit">MB</span></div>
+      <div class="kpi-sub" id="ks-net-r">↓ — MB recibido</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Procesos activos</div>
+      <div class="kpi-value" id="kv-procs">—</div>
+      <div class="kpi-sub">top 10 por CPU</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Tiempo sistema</div>
+      <div class="kpi-value" id="kv-uptime" style="font-size:1.2rem">—</div>
+      <div class="kpi-sub" id="ks-ts">—</div>
+    </div>
+  </div>
+
+  <!-- Gráficas -->
+  <div class="section-header"><h2>Tendencia temporal</h2></div>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-title">CPU % en el tiempo</div>
+      <div class="chart-wrap"><canvas id="ch-cpu"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">RAM % en el tiempo</div>
+      <div class="chart-wrap"><canvas id="ch-ram"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Disco % en el tiempo</div>
+      <div class="chart-wrap"><canvas id="ch-disco"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Red — MB enviados acumulados</div>
+      <div class="chart-wrap"><canvas id="ch-net"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Procesos -->
+  <div class="section-header"><h2>Top 10 procesos por CPU</h2></div>
+  <div class="proc-card">
+    <table>
+      <thead>
+        <tr><th>PID</th><th>Proceso</th><th>CPU %</th><th>RAM %</th></tr>
+      </thead>
+      <tbody id="tb-procs"></tbody>
+    </table>
+  </div>
+
+  <!-- Info sistema -->
+  <div class="section-header"><h2>Información del sistema</h2></div>
+  <div class="sys-grid" id="sys-info"></div>
+
+</div><!-- /page -->
+
+<div class="footer">SysWatch · datos guardados en /datos/YYYY-MM-DD.json · actualización cada 5 s</div>
+
+<!-- ══ SCRIPTS ══════════════════════════════════════════════════════ -->
+<script>
+/* ── Config ─────────────────────────────── */
+const MAX_PUNTOS = 60;   // máximo de puntos en gráfica live
+let modo = 'live';
+let timerLive = null;
+
+/* ── Reloj ──────────────────────────────── */
+function tickReloj() {
+  document.getElementById('reloj').textContent =
+    new Date().toLocaleTimeString('es-MX', {hour12: false});
+}
+setInterval(tickReloj, 1000); tickReloj();
+
+/* ── Helpers Chart.js ───────────────────── */
+const commonOpts = {
+  responsive: true, maintainAspectRatio: false,
+  animation: { duration: 300 },
+  plugins: { legend: { display: false } },
+  scales: {
+    x: {
+      ticks: { color: '#64748b', maxTicksLimit: 8, font: { family: 'monospace', size: 10 } },
+      grid:  { color: '#1e2330' },
+    },
+    y: {
+      ticks: { color: '#64748b', font: { family: 'monospace', size: 10 } },
+      grid:  { color: '#1e2330' },
+      min: 0,
+    },
+  },
+};
+
+function makeChart(id, color, max100 = true) {
+  const ctx = document.getElementById(id).getContext('2d');
+  const gradient = ctx.createLinearGradient(0, 0, 0, 180);
+  gradient.addColorStop(0, color + '55');
+  gradient.addColorStop(1, color + '00');
+  const opts = JSON.parse(JSON.stringify(commonOpts));
+  if (max100) opts.scales.y.max = 100;
+  return new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        data: [], borderColor: color, borderWidth: 2,
+        backgroundColor: gradient, fill: true,
+        pointRadius: 0, tension: 0.35,
+      }]
+    },
+    options: opts,
+  });
+}
+
+const charts = {
+  cpu:   makeChart('ch-cpu',   '#3b82f6'),
+  ram:   makeChart('ch-ram',   '#06b6d4'),
+  disco: makeChart('ch-disco', '#22c55e'),
+  net:   makeChart('ch-net',   '#a78bfa', false),
+};
+
+function pushChart(chart, label, value, max = MAX_PUNTOS) {
+  chart.data.labels.push(label);
+  chart.data.datasets[0].data.push(value);
+  if (chart.data.labels.length > max) {
+    chart.data.labels.shift();
+    chart.data.datasets[0].data.shift();
+  }
+  chart.update('none');
+}
+
+function loadChartHistory(chart, labels, values) {
+  chart.data.labels = labels;
+  chart.data.datasets[0].data = values;
+  chart.update();
+}
+
+/* ── Actualizar KPIs desde un snapshot ──── */
+function aplicarSnapshot(d, guardarHistgrama = false) {
+  // CPU
+  const cpuPct = d.cpu.porcentaje;
+  document.getElementById('kv-cpu').innerHTML = `${cpuPct}<span class="unit">%</span>`;
+  document.getElementById('kb-cpu').style.width = cpuPct + '%';
+  document.getElementById('kb-cpu').style.background =
+    cpuPct >= 85 ? 'var(--red)' : cpuPct >= 60 ? 'var(--yellow)' : 'var(--accent)';
+  document.getElementById('ks-cpu').textContent =
+    `${d.cpu.nucleos} lógicos · ${d.cpu.fisicos} físicos · ${d.cpu.freq_mhz || '—'} MHz`;
+  document.getElementById('ka-cpu').textContent = d.cpu.alerta ? '⚠ CPU elevada' : '';
+
+  // RAM
+  const ramPct = d.memoria.porcentaje;
+  document.getElementById('kv-ram').innerHTML = `${ramPct}<span class="unit">%</span>`;
+  document.getElementById('kb-ram').style.width = ramPct + '%';
+  document.getElementById('kb-ram').style.background =
+    ramPct >= 85 ? 'var(--red)' : 'var(--accent2)';
+  document.getElementById('ks-ram').textContent =
+    `${d.memoria.usada_gb} / ${d.memoria.total_gb} GB`;
+  document.getElementById('ka-ram').textContent = d.memoria.alerta ? '⚠ RAM elevada' : '';
+
+  // Disco
+  const discoPct = d.disco.porcentaje;
+  document.getElementById('kv-disco').innerHTML = `${discoPct}<span class="unit">%</span>`;
+  document.getElementById('kb-disco').style.width = discoPct + '%';
+  document.getElementById('kb-disco').style.background =
+    discoPct >= 90 ? 'var(--red)' : discoPct >= 70 ? 'var(--yellow)' : 'var(--green)';
+  document.getElementById('ks-disco').textContent =
+    `${d.disco.usado_gb} / ${d.disco.total_gb} GB`;
+
+  // Red
+  document.getElementById('kv-net-s').innerHTML =
+    `${d.red.enviado_mb}<span class="unit">MB</span>`;
+  document.getElementById('ks-net-r').textContent =
+    `↓ ${d.red.recibido_mb} MB recibido`;
+
+  // Procesos
+  document.getElementById('kv-procs').textContent = d.procesos.length;
+
+  // Uptime / timestamp
+  document.getElementById('kv-uptime').textContent = d.timestamp;
+  document.getElementById('ks-ts').textContent =
+    `${d.os.hostname} · ${d.os.sistema} ${d.os.release}`;
+
+  // Tabla procesos
+  const tb = document.getElementById('tb-procs');
+  tb.innerHTML = '';
+  d.procesos.forEach(p => {
+    const cls = p.cpu >= 50 ? 'hi' : p.cpu >= 20 ? 'med' : '';
+    tb.innerHTML += `
+      <tr>
+        <td class="td-pid">${p.pid}</td>
+        <td class="td-name">${p.nombre}</td>
+        <td><span class="cpu-pill ${cls}">${p.cpu.toFixed(1)}%</span></td>
+        <td style="color:var(--muted)">${p.ram.toFixed(2)}%</td>
+      </tr>`;
+  });
+
+  // Info sistema
+  document.getElementById('sys-info').innerHTML = [
+    ['Sistema',       `${d.os.sistema} ${d.os.release}`],
+    ['Hostname',      d.os.hostname],
+    ['Arquitectura',  d.os.arquitectura],
+    ['Python',        d.os.python],
+    ['CPU lógicos',   d.cpu.nucleos],
+    ['CPU físicos',   d.cpu.fisicos],
+    ['Frecuencia',    d.cpu.freq_mhz ? d.cpu.freq_mhz + ' MHz' : '—'],
+    ['RAM total',     d.memoria.total_gb + ' GB'],
+    ['Disco total',   d.disco.total_gb + ' GB'],
+    ['Disco libre',   d.disco.libre_gb + ' GB'],
+  ].map(([k, v]) => `
+    <div class="sys-row">
+      <span class="sk">${k}</span>
+      <span class="sv">${v}</span>
+    </div>`).join('');
+}
+
+/* ── Modo LIVE ──────────────────────────── */
+function iniciarLive() {
+  // Limpiar gráficas
+  Object.values(charts).forEach(c => {
+    c.data.labels = []; c.data.datasets[0].data = []; c.update();
+  });
+
+  async function tick() {
+    try {
+      const r = await fetch('/datos');
+      const d = await r.json();
+      aplicarSnapshot(d);
+      pushChart(charts.cpu,   d.timestamp, d.cpu.porcentaje);
+      pushChart(charts.ram,   d.timestamp, d.memoria.porcentaje);
+      pushChart(charts.disco, d.timestamp, d.disco.porcentaje);
+      pushChart(charts.net,   d.timestamp, d.red.enviado_mb, MAX_PUNTOS);
+    } catch(e) { console.error('fetch /datos:', e); }
+  }
+
+  tick();
+  timerLive = setInterval(tick, 5000);
+}
+
+/* ── Modo HISTORIAL ─────────────────────── */
+async function cargarHistorial() {
+  const fecha = document.getElementById('sel-dia').value;
+  if (!fecha) return;
+  clearInterval(timerLive);
+
+  try {
+    const r  = await fetch(`/historial?fecha=${fecha}`);
+    const ds = await r.json();
+    if (!ds.length) { alert('Sin datos para ' + fecha); return; }
+
+    // Mostrar último snapshot en KPIs
+    aplicarSnapshot(ds[ds.length - 1]);
+
+    // Cargar gráficas con toda la historia del día
+    const labels  = ds.map(d => d.timestamp);
+    loadChartHistory(charts.cpu,   labels, ds.map(d => d.cpu.porcentaje));
+    loadChartHistory(charts.ram,   labels, ds.map(d => d.memoria.porcentaje));
+    loadChartHistory(charts.disco, labels, ds.map(d => d.disco.porcentaje));
+    loadChartHistory(charts.net,   labels, ds.map(d => d.red.enviado_mb));
+  } catch(e) { console.error('fetch /historial:', e); }
+}
+
+/* ── Cambio de modo ─────────────────────── */
+async function setModo(m) {
+  modo = m;
+  clearInterval(timerLive);
+  document.getElementById('btn-live').classList.toggle('active', m === 'live');
+  document.getElementById('btn-hist').classList.toggle('active', m === 'hist');
+  document.getElementById('sel-dia').disabled = (m === 'live');
+  document.getElementById('modo-label').textContent =
+    m === 'live' ? 'MODO: EN VIVO' : 'MODO: HISTORIAL';
+
+  if (m === 'live') {
+    iniciarLive();
+  } else {
+    // Cargar lista de días disponibles
+    const r    = await fetch('/dias');
+    const dias = await r.json();
+    const sel  = document.getElementById('sel-dia');
+    sel.innerHTML = '<option value="">— seleccionar día —</option>';
+    dias.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d; opt.textContent = d;
+      sel.appendChild(opt);
+    });
+  }
+}
+
+/* ── Arranque ───────────────────────────── */
+iniciarLive();
+</script>
+</body>
+</html>
