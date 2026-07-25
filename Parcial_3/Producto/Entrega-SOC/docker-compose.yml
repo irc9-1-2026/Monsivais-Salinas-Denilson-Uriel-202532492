@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - VIRUSTOTAL_SERVICE_URL=http://virustotal-service:3001
+      - SHODAN_SERVICE_URL=http://shodan-service:3002
+    depends_on:
+      - virustotal-service
+      - shodan-service
+    volumes:
+      - ./server:/app
+      - ./frontend:/app/frontend
+    restart: always
+
+  virustotal-service:
+    build:
+      context: ./virustotal-service
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - VT_API_KEY=${VT_API_KEY}
+      - VT_API_URL=https://www.virustotal.com/api/v3
+    volumes:
+      - ./virustotal-service:/app
+    restart: always
+
+  shodan-service:
+    build:
+      context: ./shodan-service
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=production
+      - SHODAN_API_KEY=${SHODAN_API_KEY}
+      - SHODAN_API_URL=https://api.shodan.io
+    volumes:
+      - ./shodan-service:/app
+    restart: always

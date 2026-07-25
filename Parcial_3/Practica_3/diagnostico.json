@@ -1,0 +1,57 @@
+{
+  "total_pruebas": 6,
+  "exitosas": 3,
+  "fallidas": 3,
+  "resultados": [
+    {
+      "url": "https://reqres.in/api/users/1",
+      "metodo": "GET",
+      "status": 200,
+      "categoria": "2xx",
+      "tipo": "Solicitud exitosa",
+      "accion": "Continuar con el flujo normal de la respuesta",
+      "exitoso": true
+    },
+    {
+      "url": "https://reqres.in/api/users/9999",
+      "metodo": "GET",
+      "status": 404,
+      "categoria": "4xx",
+      "tipo": "Not Found",
+      "accion": "Revisar que el ID o la ruta consultada sean correctos",
+      "exitoso": false
+    },
+    {
+      "url": "https://reqres.in/api/users",
+      "metodo": "POST",
+      "status": 201,
+      "categoria": "2xx",
+      "tipo": "Solicitud exitosa",
+      "accion": "Continuar con el flujo normal de la respuesta",
+      "exitoso": true
+    },
+    {
+      "url": "https://reqres.in/api/users/2",
+      "metodo": "DELETE",
+      "status": 204,
+      "categoria": "2xx",
+      "tipo": "Solicitud exitosa",
+      "accion": "Continuar con el flujo normal de la respuesta",
+      "exitoso": true
+    },
+    {
+      "url": "https://httpstat.us/500",
+      "metodo": "GET",
+      "error": "Timeout",
+      "accion": "Reintentar más tarde y confirmar que el servidor esté disponible",
+      "exitoso": false
+    },
+    {
+      "url": "https://httpstat.us/401",
+      "metodo": "GET",
+      "error": "Sin conexión",
+      "accion": "Confirmar la conexión de red y validar la URL",
+      "exitoso": false
+    }
+  ]
+}
