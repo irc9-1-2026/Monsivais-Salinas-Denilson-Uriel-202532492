@@ -1,0 +1,62 @@
+---
+- name: Práctica 1 - Usuario y servidor Apache
+  hosts: apache_server
+  become: no
+  gather_facts: yes
+
+  tasks:
+    - name: Crear grupo apache
+      ansible.builtin.group:
+        name: apache
+        state: present
+
+    - name: Crear usuario apache con sudo
+      ansible.builtin.user:
+        name: apache
+        group: apache
+        groups: wheel
+        shell: /bin/bash
+        create_home: yes
+        state: present
+
+    - name: Permitir a apache usar sudo sin contraseña
+      ansible.builtin.copy:
+        content: "apache ALL=(ALL) NOPASSWD:ALL\n"
+        dest: /etc/sudoers.d/apache
+        mode: '0440'
+        validate: 'visudo -cf %s'
+
+    - name: Instalar Apache (httpd)
+      ansible.builtin.dnf:
+        name: httpd
+        state: present
+
+    - name: Habilitar e iniciar el servicio httpd
+      ansible.builtin.service:
+        name: httpd
+        state: started
+        enabled: yes
+
+    - name: Abrir el puerto 80 en el firewall
+      ansible.posix.firewalld:
+        service: http
+        permanent: yes
+        state: enabled
+        immediate: yes
+
+    - name: Crear página de inicio básica
+      ansible.builtin.copy:
+        content: "<html><body><h1>Servidor Apache - Practica 1 - Ansible</h1></body></html>\n"
+        dest: /var/www/html/index.html
+        mode: '0644'
+
+    - name: Verificar que Apache responde
+      ansible.builtin.uri:
+        url: http://localhost
+        method: GET
+      register: apache_response
+
+
+    - name: Mostrar código de respuesta
+      debug:
+        msg: "Apache respondió con status {{ apache_response.status }}"
