@@ -1,0 +1,13 @@
+# Generado por Ansible - no editar manualmente
+# Servidor: {{ inventory_hostname }} ({{ ansible_host }})
+<VirtualHost *:{{ apache_listen_port }}>
+    ServerName {{ apache_vhosts[0].servername }}
+    DocumentRoot {{ apache_vhosts[0].documentroot }}
+
+    <Directory "{{ apache_vhosts[0].documentroot }}">
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    {{ apache_vhosts[0].extra_parameters }}
+</VirtualHost>

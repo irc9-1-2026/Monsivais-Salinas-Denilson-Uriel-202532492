@@ -1,0 +1,42 @@
+---
+- name: Asegurarse de que los paquetes básicos estén instalados
+  ansible.builtin.package:
+    name:
+      - vim
+      - curl
+      - wget
+      - chrony
+      - firewalld
+      - python3
+    state: present
+
+- name: Configurar zona horaria
+  community.general.timezone:
+    name: "{{ timezone }}"
+
+- name: Iniciar y habilitar servicio de tiempo (chrony)
+  ansible.builtin.service:
+    name: chronyd
+    state: started
+    enabled: true
+
+- name: Iniciar y habilitar firewalld
+  ansible.builtin.service:
+    name: firewalld
+    state: started
+    enabled: true
+
+- name: Configurar firewall (puertos permitidos)
+  ansible.posix.firewalld:
+    port: "{{ item }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop: "{{ firewall_allowed_tcp_ports }}"
+  notify: reload firewall
+
+- name: Asegurarse de que SELinux esté en modo permisivo
+  ansible.posix.selinux:
+    policy: targeted
+    state: permissive
+  when: ansible_facts['os_family'] == "RedHat"

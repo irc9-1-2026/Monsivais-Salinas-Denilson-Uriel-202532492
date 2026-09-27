@@ -1,0 +1,18 @@
+---
+- name: Aplicar configuración común a todos los servidores (Ansible_1, Ansible_2, Ansible_3)
+  hosts: lamp
+  become: true
+  roles:
+    - common
+
+- name: Configurar servidor web (Ansible_2 - 192.168.5.22)
+  hosts: webservers
+  become: true
+  roles:
+    - web
+
+- name: Configurar servidor de base de datos (Ansible_3 - 192.168.5.23)
+  hosts: dbservers
+  become: true
+  roles:
+    - db

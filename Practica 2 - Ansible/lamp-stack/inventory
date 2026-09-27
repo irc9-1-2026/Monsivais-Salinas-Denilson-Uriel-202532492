@@ -1,0 +1,15 @@
+[control]
+ansible3 ansible_host=192.168.5.23 ansible_connection=local
+
+[webservers]
+ansible2 ansible_host=192.168.5.22 ansible_user=root
+
+[dbservers]
+ansible1 ansible_host=192.168.5.21 ansible_user=root
+
+# El grupo "lamp" agrupa a TODOS los servidores (control, web y db)
+# para que el rol "common" se aplique en los tres.
+[lamp:children]
+control
+webservers
+dbservers

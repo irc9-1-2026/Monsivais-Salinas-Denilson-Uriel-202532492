@@ -1,0 +1,66 @@
+---
+- name: Instalar paquetes de MySQL/MariaDB
+  ansible.builtin.package:
+    name:
+      - mariadb-server
+      - python3-PyMySQL
+    state: present
+
+- name: Iniciar y habilitar MariaDB
+  ansible.builtin.service:
+    name: mariadb
+    state: started
+    enabled: true
+
+- name: Configurar MySQL (my.cnf)
+  ansible.builtin.template:
+    src: my.cnf.j2
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: '0644'
+  loop: "{{ mysql_config_include_files }}"
+  notify: restart mysql
+
+- name: Establecer contraseña de root para MySQL
+  community.mysql.mysql_user:
+    name: root
+    host: "{{ item }}"
+    password: "{{ mysql_root_password }}"
+    login_unix_socket: /var/lib/mysql/mysql.sock
+    state: present
+  loop:
+    - localhost
+    - 127.0.0.1
+    - ::1
+  ignore_errors: true  # Para manejar casos en que la contraseña ya esté establecida
+
+- name: Crear bases de datos MySQL
+  community.mysql.mysql_db:
+    name: "{{ item.name }}"
+    encoding: "{{ item.encoding | default('utf8') }}"
+    collation: "{{ item.collation | default('utf8_general_ci') }}"
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+    state: present
+  loop: "{{ mysql_databases }}"
+
+- name: Crear usuarios MySQL
+  community.mysql.mysql_user:
+    name: "{{ item.name }}"
+    host: "{{ item.host | default('localhost') }}"
+    password: "{{ item.password }}"
+    priv: "{{ item.priv }}"
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+    state: present
+  loop: "{{ mysql_users }}"
+
+- name: Configurar firewall para MySQL (solo desde el servidor web)
+  ansible.posix.firewalld:
+    port: 3306/tcp
+    permanent: true
+    state: enabled
+    immediate: true
+    source: "{{ webserver_ip }}"
+  notify: reload firewall

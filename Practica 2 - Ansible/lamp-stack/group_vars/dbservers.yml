@@ -1,0 +1,23 @@
+---
+# Variables específicas para servidores de base de datos (Ansible_3 - 192.168.5.23)
+mysql_root_password: "supersegura"  # En producción usaríamos ansible-vault
+
+mysql_databases:
+  - name: webapp
+    encoding: utf8
+    collation: utf8_general_ci
+
+mysql_users:
+  - name: webapp_user
+    # En producción, restringe "host" a la IP del webserver (192.168.5.22)
+    # en lugar de "%" para no exponer la cuenta a cualquier origen.
+    host: "%"
+    password: "userpass"  # En producción usaríamos ansible-vault
+    priv: "webapp.*:ALL"
+
+mysql_config_include_files:
+  - src: my.cnf.j2
+    dest: /etc/my.cnf.d/custom.cnf
+
+# IP del servidor web, usada para permitir el acceso remoto en firewall/MySQL
+webserver_ip: "192.168.5.22"
