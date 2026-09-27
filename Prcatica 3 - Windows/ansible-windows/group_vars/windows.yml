@@ -1,0 +1,10 @@
+---
+# Variables para el grupo windows
+ansible_user: Administrator
+ansible_password: "CAMBIA_ESTA_CONTRASEÑA"   # contraseña real del usuario Administrator
+ansible_winrm_scheme: https
+
+# Recomendado: cifra este archivo con ansible-vault en lugar de dejar la
+# contraseña en texto plano:
+#   ansible-vault encrypt group_vars/windows.yml
+# y luego ejecuta los playbooks con --ask-vault-pass

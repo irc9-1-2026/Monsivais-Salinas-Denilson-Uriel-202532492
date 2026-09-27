@@ -1,0 +1,27 @@
+---
+- name: Gestionar características de Windows
+  hosts: windows
+  gather_facts: true
+
+  tasks:
+    - name: Obtener características instaladas
+      ansible.windows.win_feature:
+        name: "*"
+        state: present
+      register: feature_list
+      check_mode: true
+
+    - name: Mostrar características instaladas
+      ansible.builtin.debug:
+        msg: "{{ feature_list.features | selectattr('installed', 'equalto', true) | map(attribute='name') | list }}"
+
+    - name: Instalar característica Web-Server (IIS)
+      ansible.windows.win_feature:
+        name: Web-Server
+        state: present
+        include_management_tools: true
+      register: iis_install
+
+    - name: Reiniciar si es necesario
+      ansible.windows.win_reboot:
+      when: iis_install.reboot_required
